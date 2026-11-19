@@ -1,0 +1,3 @@
+# Used by Streamlit Community Cloud to run app/streamlit_app.py.
+# For local development, use: pip install -e ".[dev]"
+.[app]

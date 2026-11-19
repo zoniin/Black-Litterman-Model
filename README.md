@@ -15,6 +15,19 @@ Plain mean-variance optimisation takes historical mean returns at face value. Th
 
 *Eight US large caps with three illustrative views: JPM returns 14% (60% confident), XOM beats NVDA by 5% (40%), and an equal JNJ/GOOGL basket returns 12% (30%). Weights move only where the views point. Produced by [`examples/quickstart.py`](examples/quickstart.py).*
 
+## Interactive demo
+
+Type in your own views, set how confident you are, and watch the expected returns, weights and efficient frontier update.
+
+<p align="center"><img src="docs/images/app.png" width="90%" alt="Streamlit demo: a views table, portfolio metrics, and market vs Black-Litterman weights"></p>
+
+```bash
+pip install -e ".[app]"
+streamlit run app/streamlit_app.py
+```
+
+The demo starts from a bundled snapshot of 10 US large caps (covariance, market caps and implied risk aversion only, no raw prices), so it loads instantly and works offline. Switch to *Live* in the sidebar to download any tickers from Yahoo Finance.
+
 ## Highlights
 
 - **Correct and numerically stable.** The posterior uses the update form that never inverts $\Sigma$ or $\Omega$, so a 100%-confidence view is exact rather than a division by zero. Tests check it against the textbook master formula to 1e-10.
@@ -23,7 +36,7 @@ Plain mean-variance optimisation takes historical mean returns at face value. Th
 - **Label-aware.** Pass pandas objects and write views by ticker. Outputs come back as labelled `Series`/`DataFrame`s.
 - **Sound data handling.** Prices are adjusted closes that are forward-filled and never back-filled, so there is no look-ahead. A dependency-free Ledoit-Wolf shrinkage estimator matches scikit-learn exactly. A missing market cap raises an error instead of being silently replaced with a placeholder.
 - **A walk-forward backtester** with no look-ahead (a test checks it), drifting weights, transaction costs, and benchmark-relative statistics. It ships with market-cap, 1/N, mean-variance and Black-Litterman strategies, and views can come from any signal you plug in.
-- **74 tests, 97% coverage**, with CI on Python 3.10-3.13. The tests check textbook identities, not just that the code runs (see [Testing](#testing)).
+- **79 tests, 97% coverage**, with CI on Python 3.10-3.13. The tests check textbook identities, not just that the code runs (see [Testing](#testing)).
 
 ## Install
 
@@ -195,6 +208,7 @@ The tests check the maths against known results:
 - `max_sharpe`, `min_volatility` and `max_quadratic_utility` match their closed forms when unconstrained. Long-only `max_sharpe` beats 2,000 random portfolios, and the tangency portfolio lies on the frontier.
 - `ledoit_wolf` matches `sklearn.covariance.LedoitWolf`.
 - The backtester has no look-ahead: shocking every price after a date leaves every earlier decision and return unchanged. Tests also check buy-and-hold drift, cost accounting, and the rule that Black-Litterman with no views equals the market-cap strategy.
+- The Streamlit app runs headless in CI through `streamlit.testing`, and its view parsing and bundled snapshot are checked too.
 - The data layer runs against a fake `yfinance`, so CI never touches the network. It checks adjusted prices, no back-fill, and an error on a missing cap.
 
 ## References
