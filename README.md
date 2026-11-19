@@ -1,541 +1,138 @@
-# Black-Litterman Portfolio Optimization Model
+# Black-Litterman Portfolio Construction
 
-A comprehensive, production-ready implementation of the Black-Litterman portfolio optimization model in Python. This package combines market equilibrium with investor views using Bayesian inference to generate robust, diversified portfolios.
+[![CI](https://github.com/zoniin/Black-Litterman-Model/actions/workflows/ci.yml/badge.svg)](https://github.com/zoniin/Black-Litterman-Model/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.10%E2%80%933.13-blue)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+A small, tested Python implementation of the **Black-Litterman model**. It takes market-implied equilibrium returns, blends in your views with a Bayesian update, and turns the result into portfolios with convex optimisation.
 
-## Features
+Plain mean-variance optimisation takes historical mean returns at face value. The usual result is an extreme, unstable portfolio that piles into whichever asset had a good few years. Black-Litterman starts from the portfolio the market already holds and moves away from it only where you have an opinion, by an amount set by how confident you are.
 
-- **Complete Black-Litterman Implementation**
-  - Market equilibrium calculation via reverse optimization
-  - Bayesian combination of prior and views
-  - Multiple view types (absolute, relative, custom)
-  - Confidence-based view weighting
+<p align="center">
+  <img src="docs/images/returns.png" width="49%" alt="Prior vs posterior expected returns">
+  <img src="docs/images/weights.png" width="49%" alt="Market vs Black-Litterman weights">
+</p>
 
-- **Advanced Portfolio Optimization**
-  - Maximum Sharpe ratio
-  - Minimum volatility
-  - Target return optimization
-  - Custom constraints and regularization
-  - Efficient frontier calculation
+*Eight US large caps with three illustrative views: JPM returns 14% (60% confident), XOM beats NVDA by 5% (40%), and an equal JNJ/GOOGL basket returns 12% (30%). Weights move only where the views point. Produced by [`examples/quickstart.py`](examples/quickstart.py).*
 
-- **Data Integration**
-  - Automatic data fetching via Yahoo Finance
-  - Multiple covariance estimation methods (sample, Ledoit-Wolf, shrinkage)
-  - Market capitalization-based equilibrium weights
+## Highlights
 
-- **Comprehensive Visualization**
-  - Efficient frontier plots
-  - Portfolio weight visualization
-  - Return attribution analysis
-  - Correlation heatmaps
-  - Interactive dashboards
+- **Correct and numerically stable.** The posterior uses the update form that never inverts $\Sigma$ or $\Omega$, so a 100%-confidence view is exact rather than a division by zero. Tests check it against the textbook master formula to 1e-10.
+- **Intuitive confidence.** Each view takes a 0-100% confidence (Idzorek, 2005), through Walters' closed form. At confidence $c$, the posterior moves *exactly* a fraction $c$ of the way to the 100%-certain view. A test checks this.
+- **A real max-Sharpe optimiser.** The Cornuejols-Tütüncü transform turns the non-convex Sharpe ratio into a QP, so it works with weight bounds. Tests check the result against the closed-form tangency portfolio. Min-volatility, target-return, quadratic utility and a parametrised efficient frontier are included too.
+- **Label-aware.** Pass pandas objects and write views by ticker. Outputs come back as labelled `Series`/`DataFrame`s.
+- **Sound data handling.** Prices are adjusted closes that are forward-filled and never back-filled, so there is no look-ahead. A dependency-free Ledoit-Wolf shrinkage estimator matches scikit-learn exactly. A missing market cap raises an error instead of being silently replaced with a placeholder.
+- **58 tests, 96% coverage**, with CI on Python 3.10-3.13. The tests check textbook identities, not just that the code runs (see [Testing](#testing)).
 
-- **Production-Ready**
-  - Extensive documentation
-  - Unit tests
-  - Type hints
-  - Error handling
-  - Validation utilities
-
-## Table of Contents
-
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Mathematical Background](#mathematical-background)
-- [Usage Guide](#usage-guide)
-- [Examples](#examples)
-- [API Reference](#api-reference)
-- [Contributing](#contributing)
-- [License](#license)
-
-## Installation
-
-### Prerequisites
-
-- Python 3.8 or higher
-- pip package manager
-
-### Basic Installation
+## Install
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/Black-Litterman-Model.git
+git clone https://github.com/zoniin/Black-Litterman-Model.git
 cd Black-Litterman-Model
-
-# Install dependencies
-pip install -r requirements.txt
+pip install -e ".[plot,data]"     # core needs only numpy, pandas, cvxpy
 ```
 
-### Dependencies
-
-The package requires the following libraries:
-
-```
-numpy>=1.24.0
-pandas>=2.0.0
-scipy>=1.10.0
-matplotlib>=3.7.0
-seaborn>=0.12.0
-yfinance>=0.2.0
-cvxpy>=1.3.0
-plotly>=5.14.0
-```
-
-## Quick Start
-
-Here's a minimal example to get you started:
+## Quick start
 
 ```python
-from src.black_litterman import BlackLittermanModel
-from src.data_utils import prepare_bl_inputs
-from src.visualization import plot_efficient_frontier
+from blacklitterman import BlackLitterman, ledoit_wolf, max_sharpe, returns_from_prices
+from blacklitterman.data import fetch_prices, fetch_market_caps, market_implied_risk_aversion
 
-# Define your asset universe
-tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'JPM']
+tickers = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "JPM", "XOM", "JNJ"]
+prices = fetch_prices([*tickers, "SPY"], period="5y")
+cov = ledoit_wolf(returns_from_prices(prices[tickers]))
+delta = market_implied_risk_aversion(prices["SPY"], risk_free_rate=0.04)
 
-# Fetch data and prepare inputs
-data = prepare_bl_inputs(
-    tickers=tickers,
-    period='2y',
-    risk_free_rate=0.03
-)
+bl = BlackLitterman(cov, market_caps=fetch_market_caps(tickers), risk_aversion=delta, tau=0.05, risk_free_rate=0.04)
 
-# Initialize the Black-Litterman model
-bl_model = BlackLittermanModel(
-    cov_matrix=data['cov_matrix'],
-    market_caps=data['market_caps'],
-    risk_aversion=2.5,
-    tau=0.025
-)
+bl.add_absolute_view("JPM", 0.14, confidence=0.6)  # JPM returns 14%
+bl.add_relative_view("XOM", "NVDA", 0.05, confidence=0.4)  # XOM beats NVDA by 5%
+bl.add_view({"JNJ": 0.5, "GOOGL": 0.5}, 0.12, confidence=0.3)  # any linear view
 
-# Add investor views
-bl_model.add_absolute_view(
-    asset_idx=0,  # Apple
-    expected_return=0.12,  # 12% expected return
-    confidence=0.8  # High confidence
-)
+bl.summary()  # market weight, prior, posterior, view impact, BL weight per asset
+bl.view_summary()  # each view vs. what the prior and posterior imply
 
-# Calculate posterior distribution
-posterior_returns, posterior_cov = bl_model.calculate_posterior()
-
-# Optimize portfolio
-optimal_weights = bl_model.optimize_portfolio(
-    optimization_type='max_sharpe'
-)
-
-# Display results
-print("Optimal Weights:", optimal_weights)
-metrics = bl_model.calculate_portfolio_metrics(optimal_weights)
-print(f"Sharpe Ratio: {metrics['sharpe_ratio']:.3f}")
+weights = max_sharpe(bl.posterior_returns(), bl.posterior_cov(), risk_free_rate=0.04, bounds=(0, 0.35))
 ```
 
-## Mathematical Background
-
-### The Black-Litterman Formula
-
-The Black-Litterman model computes posterior expected returns by combining market equilibrium (prior) with investor views using Bayesian inference:
-
-$$E[R] = [(\\tau\\Sigma)^{-1} + P'\\Omega^{-1}P]^{-1} [(\\tau\\Sigma)^{-1}\\Pi + P'\\Omega^{-1}Q]$$
-
-where:
-
-- **E[R]**: Posterior expected returns (what we want to find)
-- **Π** (Pi): Prior expected returns from market equilibrium
-- **Σ** (Sigma): Covariance matrix of asset returns
-- **P**: Picking matrix that identifies assets in each view
-- **Q**: Vector of view returns (expected returns from views)
-- **Ω** (Omega): Diagonal matrix representing uncertainty in views
-- **τ** (tau): Scalar parameter controlling uncertainty in prior (typically 0.01-0.05)
-
-### Market Equilibrium (Prior)
-
-The prior is derived from market equilibrium using reverse optimization (CAPM):
-
-$$\\Pi = \\delta \\Sigma w_{mkt}$$
-
-where:
-- **δ** (delta): Risk aversion coefficient
-- **w_mkt**: Market capitalization weights
-
-### View Specification
-
-Views are specified through the picking matrix **P** and view returns **Q**:
-
-**Absolute View**: "Asset i will return q%"
-```
-P = [0, 0, ..., 1, ..., 0]  (1 at position i)
-Q = [q]
-```
-
-**Relative View**: "Asset i will outperform asset j by q%"
-```
-P = [0, ..., 1, ..., -1, ..., 0]  (1 at i, -1 at j)
-Q = [q]
-```
-
-### View Uncertainty
-
-The uncertainty matrix **Ω** is typically diagonal:
-
-$$\\Omega_{ii} = \\frac{P_i \\Sigma P_i'}{c_i}$$
-
-where **c_i** is the confidence level (0 < c_i ≤ 1) for view i.
-
-### Posterior Covariance
-
-The posterior covariance matrix is:
-
-$$Cov[R] = \\Sigma + [(\\tau\\Sigma)^{-1} + P'\\Omega^{-1}P]^{-1}$$
-
-## Usage Guide
-
-### 1. Data Preparation
-
-```python
-from src.data_utils import prepare_bl_inputs
-
-# Automatic data preparation
-data = prepare_bl_inputs(
-    tickers=['AAPL', 'MSFT', 'GOOGL'],
-    period='3y',  # Historical period
-    cov_method='ledoit_wolf',  # Shrinkage estimator
-    risk_free_rate=0.03
-)
-```
-
-### 2. Model Initialization
-
-```python
-from src.black_litterman import BlackLittermanModel
-
-bl_model = BlackLittermanModel(
-    cov_matrix=data['cov_matrix'],
-    market_caps=data['market_caps'],
-    risk_aversion=2.5,  # Market risk aversion
-    tau=0.025,  # Prior uncertainty
-    risk_free_rate=0.03
-)
-```
-
-### 3. Adding Views
-
-#### Absolute Views
-
-```python
-# "Apple will return 12%"
-bl_model.add_absolute_view(
-    asset_idx=0,
-    expected_return=0.12,
-    confidence=0.8
-)
-```
-
-#### Relative Views
-
-```python
-# "Microsoft will outperform Google by 3%"
-bl_model.add_relative_view(
-    asset_idx1=1,  # Microsoft
-    asset_idx2=2,  # Google
-    outperformance=0.03,
-    confidence=0.6
-)
-```
-
-#### Custom Views
-
-```python
-# "A portfolio of 50% AAPL + 50% MSFT will return 10%"
-picking_vector = [0.5, 0.5, 0, 0, 0]
-bl_model.add_custom_view(
-    picking_vector=picking_vector,
-    expected_return=0.10,
-    confidence=0.7
-)
-```
-
-#### Batch Views
-
-```python
-views = [
-    {'type': 'absolute', 'assets': 0, 'return': 0.12, 'confidence': 0.8},
-    {'type': 'relative', 'assets': (1, 2), 'return': 0.03, 'confidence': 0.6}
-]
-bl_model.add_views_from_dict(views)
-```
-
-### 4. Calculate Posterior
-
-```python
-posterior_returns, posterior_cov = bl_model.calculate_posterior()
-
-# View summary
-summary = bl_model.summary(asset_names=['AAPL', 'MSFT', 'GOOGL'])
-print(summary)
-```
-
-### 5. Portfolio Optimization
-
-```python
-# Maximum Sharpe ratio
-weights = bl_model.optimize_portfolio(
-    optimization_type='max_sharpe',
-    allow_short=False,
-    weight_bounds=(0.0, 0.4),  # Max 40% per asset
-    l2_gamma=0.1  # Regularization for diversification
-)
-
-# Minimum volatility
-weights_min_vol = bl_model.optimize_portfolio(
-    optimization_type='min_volatility'
-)
-
-# Target return
-weights_target = bl_model.optimize_portfolio(
-    optimization_type='target_return',
-    target_return=0.10
-)
-```
-
-### 6. Analysis and Visualization
-
-```python
-from src.visualization import (
-    plot_efficient_frontier,
-    plot_portfolio_weights,
-    plot_return_attribution,
-    create_portfolio_dashboard
-)
-
-# Efficient frontier
-frontier_returns, frontier_vols, _ = bl_model.calculate_efficient_frontier(n_points=100)
-plot_efficient_frontier(frontier_returns, frontier_vols, optimal_weights=weights)
-
-# Portfolio weights
-plot_portfolio_weights(weights, asset_names)
-
-# Return attribution
-plot_return_attribution(bl_model, asset_names)
-
-# Comprehensive dashboard
-create_portfolio_dashboard(bl_model, weights, asset_names)
-```
-
-### 7. Portfolio Metrics
-
-```python
-metrics = bl_model.calculate_portfolio_metrics(weights)
-
-print(f"Expected Return: {metrics['expected_return']:.2%}")
-print(f"Volatility: {metrics['volatility']:.2%}")
-print(f"Sharpe Ratio: {metrics['sharpe_ratio']:.3f}")
-print(f"Effective Assets: {metrics['effective_assets']:.2f}")
-```
-
-## Examples
-
-### Example 1: Simple 5-Asset Portfolio
-
-See `examples/simple_example.py` for a complete working example.
+Run the whole pipeline and regenerate the figures with:
 
 ```bash
-cd examples
-python simple_example.py
+python examples/quickstart.py --save docs/images
 ```
 
-### Example 2: Comprehensive Analysis
+For a guided tour, see [`notebooks/walkthrough.ipynb`](notebooks/walkthrough.ipynb). It covers the equilibrium prior, how a single view propagates, what "confidence" means, and a run on live data.
 
-The Jupyter notebook `notebooks/comprehensive_example.ipynb` contains a detailed walkthrough including:
+## The model
 
-- Data preparation and exploration
-- Multiple view specifications
-- Sensitivity analysis
-- Efficient frontier analysis
-- Strategy comparison
-- Full visualization suite
+**Prior.** If the market-cap-weighted portfolio $w_{mkt}$ is optimal for an investor with risk aversion $\delta$, expected returns must be
 
-```bash
-jupyter notebook notebooks/comprehensive_example.ipynb
-```
+$$\Pi = r_f + \delta\,\Sigma\,w_{mkt}.$$
 
-## API Reference
+**Views.** Each view is a linear statement $p_k^\top \mu = q_k$ with uncertainty $\Omega_{kk}$. Stack them into $P$, $Q$ and $\Omega$.
 
-### BlackLittermanModel
+**Posterior.** Combining the prior $\mu \sim N(\Pi, \tau\Sigma)$ with the views gives
 
-Main class for Black-Litterman portfolio optimization.
+$$\mu_{BL} = \Pi + \tau\Sigma P^\top \left(P\tau\Sigma P^\top + \Omega\right)^{-1}(Q - P\Pi)$$
 
-#### Initialization
+$$\Sigma_{BL} = \Sigma + \tau\Sigma - \tau\Sigma P^\top \left(P\tau\Sigma P^\top + \Omega\right)^{-1} P\tau\Sigma$$
 
-```python
-BlackLittermanModel(
-    cov_matrix: np.ndarray,
-    market_caps: Optional[np.ndarray] = None,
-    risk_aversion: float = 2.5,
-    tau: float = 0.025,
-    risk_free_rate: float = 0.02
-)
-```
+This is algebraically identical to the familiar $[(\tau\Sigma)^{-1} + P^\top\Omega^{-1}P]^{-1}[(\tau\Sigma)^{-1}\Pi + P^\top\Omega^{-1}Q]$. It only inverts a small $k \times k$ matrix and stays well-defined when $\Omega$ is singular.
 
-#### Key Methods
+**Confidence.** View uncertainty can be given three ways:
 
-- `add_absolute_view(asset_idx, expected_return, confidence)`: Add absolute view
-- `add_relative_view(asset_idx1, asset_idx2, outperformance, confidence)`: Add relative view
-- `add_custom_view(picking_vector, expected_return, confidence)`: Add custom view
-- `calculate_posterior()`: Compute posterior distribution
-- `optimize_portfolio(optimization_type, **kwargs)`: Optimize portfolio weights
-- `calculate_efficient_frontier(n_points, allow_short)`: Calculate efficient frontier
-- `calculate_portfolio_metrics(weights)`: Compute portfolio metrics
-- `summary(asset_names)`: Generate summary DataFrame
+| Argument | $\Omega_{kk}$ | Meaning |
+|---|---|---|
+| `confidence=c` | $\frac{1-c}{c}\, p_k \tau\Sigma p_k^\top$ | Posterior moves fraction $c$ toward the view (Idzorek / Walters) |
+| *(neither)* | $p_k \tau\Sigma p_k^\top$ | He-Litterman default, the same as `confidence=0.5` |
+| `omega=v` | $v$ | Set the view variance yourself |
 
-### Data Utilities
+<p align="center"><img src="docs/images/confidence.png" width="80%" alt="Confidence maps linearly to how far the view moves the posterior"></p>
 
-- `prepare_bl_inputs(tickers, start_date, end_date, period, cov_method, risk_free_rate)`: One-stop data preparation
-- `fetch_price_data(tickers, start_date, end_date, period)`: Fetch historical prices
-- `calculate_returns(prices, method, frequency)`: Calculate returns
-- `calculate_covariance_matrix(returns, method, shrinkage, frequency)`: Estimate covariance
-- `get_market_caps(tickers)`: Fetch market capitalizations
+**Weights.** The unconstrained optimum $w^* = (\delta\Sigma_{BL})^{-1}(\mu_{BL} - r_f)$ equals $w_{mkt}/(1+\tau)$ plus a combination of the view portfolios. This is why assets you have no view on keep their market weight (`bl.implied_weights()`). For long-only or bounded portfolios, pass the posterior to any optimiser in `blacklitterman.optimize`.
 
-### Visualization Functions
+<p align="center"><img src="docs/images/frontier.png" width="60%" alt="Efficient frontier under the posterior"></p>
 
-- `plot_efficient_frontier(...)`: Plot efficient frontier
-- `plot_portfolio_weights(...)`: Bar chart of portfolio weights
-- `plot_return_attribution(...)`: Attribution analysis
-- `plot_correlation_matrix(...)`: Correlation heatmap
-- `create_portfolio_dashboard(...)`: Comprehensive dashboard
+## API overview
 
-## Advanced Topics
+| Module | Contents |
+|---|---|
+| `blacklitterman.model` | `BlackLitterman`: `add_absolute_view`, `add_relative_view`, `add_view`, `posterior_returns`, `posterior_cov`, `implied_weights`, `summary`, `view_summary` |
+| `blacklitterman.optimize` | `max_sharpe`, `min_volatility`, `efficient_return`, `max_quadratic_utility`, `efficient_frontier`, `portfolio_performance` |
+| `blacklitterman.risk` | `returns_from_prices`, `sample_cov`, `ledoit_wolf`, `cov_to_corr` |
+| `blacklitterman.data` | `fetch_prices`, `fetch_market_caps`, `market_implied_risk_aversion` (needs `yfinance`) |
+| `blacklitterman.plotting` | `plot_returns`, `plot_weights`, `plot_efficient_frontier`, `plot_correlation` |
 
-### Custom Risk Aversion
-
-Estimate market risk aversion from historical data:
-
-```python
-from src.data_utils import estimate_risk_aversion
-
-delta = estimate_risk_aversion(
-    market_return=0.10,
-    market_variance=0.04,
-    risk_free_rate=0.02
-)
-```
-
-### Covariance Estimation Methods
-
-```python
-# Sample covariance
-cov = calculate_covariance_matrix(returns, method='sample')
-
-# Ledoit-Wolf shrinkage (recommended)
-cov = calculate_covariance_matrix(returns, method='ledoit_wolf')
-
-# Custom shrinkage
-cov = calculate_covariance_matrix(returns, method='shrinkage', shrinkage=0.2)
-```
-
-### Portfolio Constraints
-
-```python
-# No short selling, max 30% per asset
-weights = bl_model.optimize_portfolio(
-    optimization_type='max_sharpe',
-    allow_short=False,
-    weight_bounds=(0.0, 0.3)
-)
-
-# L2 regularization for diversification
-weights = bl_model.optimize_portfolio(
-    optimization_type='max_sharpe',
-    l2_gamma=0.5  # Higher = more diversification
-)
-```
+All returns are annualised, arithmetic and in decimals (0.08 = 8%). Priors, absolute views and posteriors are total returns. Relative views are spreads.
 
 ## Testing
 
-Run the test suite:
-
 ```bash
-pytest tests/
+pip install -e ".[dev]"
+pytest --cov=blacklitterman
+ruff check . && ruff format --check .
 ```
 
-Run with coverage:
+The tests check the maths against known results:
 
-```bash
-pytest --cov=src tests/
-```
-
-## Project Structure
-
-```
-Black-Litterman-Model/
-├── src/
-│   ├── __init__.py
-│   ├── black_litterman.py      # Core BL model
-│   ├── data_utils.py           # Data fetching and processing
-│   └── visualization.py        # Plotting functions
-├── notebooks/
-│   └── comprehensive_example.ipynb
-├── examples/
-│   └── simple_example.py
-├── tests/
-│   ├── test_black_litterman.py
-│   ├── test_data_utils.py
-│   └── test_visualization.py
-├── requirements.txt
-└── README.md
-```
-
-## Theoretical Foundation
-
-The Black-Litterman model was developed by Fischer Black and Robert Litterman at Goldman Sachs in 1990-1992. It addresses key limitations of traditional mean-variance optimization:
-
-1. **Input Sensitivity**: Small changes in expected returns lead to extreme portfolio changes
-2. **Concentrated Portfolios**: Optimizer produces corner solutions with extreme weights
-3. **Ignoring Market Equilibrium**: No reference to market consensus
-
-### Key Advantages
-
-- **Stable Portfolios**: Incorporates market equilibrium as anchor
-- **Intuitive Views**: Express views in natural language (relative/absolute)
-- **Confidence Levels**: Weight views by conviction
-- **Diversification**: More balanced portfolios than MVO
-- **Bayesian Framework**: Principled combination of prior and views
+- With no views, the posterior equals the prior and optimal weights equal $w_{mkt}/(1+\tau)$ (He & Litterman, 1999).
+- The update form matches the master formula, for both returns and covariance.
+- 100%-confidence absolute and relative views hold exactly.
+- Idzorek's linear-tilt property holds at several confidence levels.
+- Weight tilts lie in the span of $P^\top$, and assets without views keep their market weight.
+- `max_sharpe`, `min_volatility` and `max_quadratic_utility` match their closed forms when unconstrained. Long-only `max_sharpe` beats 2,000 random portfolios, and the tangency portfolio lies on the frontier.
+- `ledoit_wolf` matches `sklearn.covariance.LedoitWolf`.
+- The data layer runs against a fake `yfinance`, so CI never touches the network. It checks adjusted prices, no back-fill, and an error on a missing cap.
 
 ## References
 
-1. Black, F., & Litterman, R. (1992). "Global Portfolio Optimization". Financial Analysts Journal, 48(5), 28-43.
-
-2. He, G., & Litterman, R. (1999). "The Intuition Behind Black-Litterman Model Portfolios". Goldman Sachs Quantitative Resources Group.
-
-3. Idzorek, T. (2005). "A Step-by-Step Guide to the Black-Litterman Model". Ibbotson Associates.
-
-4. Walters, J. (2014). "The Black-Litterman Model in Detail". Available at SSRN.
-
-## Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+- Black, F. & Litterman, R. (1992). *Global Portfolio Optimization.* Financial Analysts Journal, 48(5).
+- He, G. & Litterman, R. (1999). *The Intuition Behind Black-Litterman Model Portfolios.* Goldman Sachs.
+- Idzorek, T. (2005). *A Step-by-Step Guide to the Black-Litterman Model.*
+- Walters, J. (2014). *The Black-Litterman Model in Detail.* SSRN 1314585.
+- Cornuejols, G. & Tütüncü, R. (2006). *Optimization Methods in Finance.* Cambridge University Press.
+- Ledoit, O. & Wolf, M. (2004). *A well-conditioned estimator for large-dimensional covariance matrices.* J. Multivariate Analysis, 88(2).
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Acknowledgments
-
-- Fischer Black and Robert Litterman for developing the model
-- The quantitative finance community for various implementations and insights
-- Contributors to the open-source libraries used in this project
-
-## Contact
-
-For questions, issues, or suggestions, please open an issue on GitHub.
-
----
-
-**Disclaimer**: This software is for educational and research purposes only. It is not intended as financial advice. Always consult with qualified financial professionals before making investment decisions.
+MIT. See [LICENSE](LICENSE). Nothing here is investment advice.
