@@ -37,14 +37,24 @@ pip install -e ".[plot,data]"     # core needs only numpy, pandas, cvxpy
 
 ```python
 from blacklitterman import BlackLitterman, ledoit_wolf, max_sharpe, returns_from_prices
-from blacklitterman.data import fetch_prices, fetch_market_caps, market_implied_risk_aversion
+from blacklitterman.data import (
+    fetch_market_caps,
+    fetch_prices,
+    market_implied_risk_aversion,
+)
 
 tickers = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "JPM", "XOM", "JNJ"]
 prices = fetch_prices([*tickers, "SPY"], period="5y")
 cov = ledoit_wolf(returns_from_prices(prices[tickers]))
 delta = market_implied_risk_aversion(prices["SPY"], risk_free_rate=0.04)
 
-bl = BlackLitterman(cov, market_caps=fetch_market_caps(tickers), risk_aversion=delta, tau=0.05, risk_free_rate=0.04)
+bl = BlackLitterman(
+    cov,
+    market_caps=fetch_market_caps(tickers),
+    risk_aversion=delta,
+    tau=0.05,
+    risk_free_rate=0.04,
+)
 
 bl.add_absolute_view("JPM", 0.14, confidence=0.6)  # JPM returns 14%
 bl.add_relative_view("XOM", "NVDA", 0.05, confidence=0.4)  # XOM beats NVDA by 5%
@@ -53,7 +63,9 @@ bl.add_view({"JNJ": 0.5, "GOOGL": 0.5}, 0.12, confidence=0.3)  # any linear view
 bl.summary()  # market weight, prior, posterior, view impact, BL weight per asset
 bl.view_summary()  # each view vs. what the prior and posterior imply
 
-weights = max_sharpe(bl.posterior_returns(), bl.posterior_cov(), risk_free_rate=0.04, bounds=(0, 0.35))
+weights = max_sharpe(
+    bl.posterior_returns(), bl.posterior_cov(), risk_free_rate=0.04, bounds=(0, 0.35)
+)
 ```
 
 Run the whole pipeline and regenerate the figures with:
@@ -96,15 +108,20 @@ from blacklitterman import backtest, black_litterman_strategy, market_cap_weight
 from blacklitterman.backtest import ViewSpec
 
 
-def low_vol_view(ctx):  # ctx.prices / ctx.returns hold data up to the rebalance date only
+def low_vol_view(ctx):
+    # ctx.prices / ctx.returns hold data up to the rebalance date only
     vol = ctx.returns.std().sort_values()
     calm, wild = vol.index[:5], vol.index[-5:]
-    return [ViewSpec({**{a: 0.2 for a in calm}, **{a: -0.2 for a in wild}}, q=0.02, confidence=0.3)]
+    basket = {**{a: 0.2 for a in calm}, **{a: -0.2 for a in wild}}
+    return [ViewSpec(basket, q=0.02, confidence=0.3)]
 
 
 result = backtest(
     prices,
-    {"Market": market_cap_weight(), "BL low-vol": black_litterman_strategy(low_vol_view, bounds=(0, 0.3))},
+    {
+        "Market": market_cap_weight(),
+        "BL low-vol": black_litterman_strategy(low_vol_view, bounds=(0, 0.3)),
+    },
     market_caps=caps,
     cost_bps=10,
 )
@@ -115,15 +132,21 @@ result.stats, result.relative_to("Market")
 
 **Prior.** If the market-cap-weighted portfolio $w_{mkt}$ is optimal for an investor with risk aversion $\delta$, expected returns must be
 
-$$\Pi = r_f + \delta\,\Sigma\,w_{mkt}.$$
+```math
+\Pi = r_f + \delta\,\Sigma\,w_{mkt}.
+```
 
 **Views.** Each view is a linear statement $p_k^\top \mu = q_k$ with uncertainty $\Omega_{kk}$. Stack them into $P$, $Q$ and $\Omega$.
 
 **Posterior.** Combining the prior $\mu \sim N(\Pi, \tau\Sigma)$ with the views gives
 
-$$\mu_{BL} = \Pi + \tau\Sigma P^\top \left(P\tau\Sigma P^\top + \Omega\right)^{-1}(Q - P\Pi)$$
+```math
+\mu_{BL} = \Pi + \tau\Sigma P^\top \left(P\tau\Sigma P^\top + \Omega\right)^{-1}(Q - P\Pi)
+```
 
-$$\Sigma_{BL} = \Sigma + \tau\Sigma - \tau\Sigma P^\top \left(P\tau\Sigma P^\top + \Omega\right)^{-1} P\tau\Sigma$$
+```math
+\Sigma_{BL} = \Sigma + \tau\Sigma - \tau\Sigma P^\top \left(P\tau\Sigma P^\top + \Omega\right)^{-1} P\tau\Sigma
+```
 
 This is algebraically identical to the familiar $[(\tau\Sigma)^{-1} + P^\top\Omega^{-1}P]^{-1}[(\tau\Sigma)^{-1}\Pi + P^\top\Omega^{-1}Q]$. It only inverts a small $k \times k$ matrix and stays well-defined when $\Omega$ is singular.
 
@@ -131,7 +154,7 @@ This is algebraically identical to the familiar $[(\tau\Sigma)^{-1} + P^\top\Ome
 
 | Argument | $\Omega_{kk}$ | Meaning |
 |---|---|---|
-| `confidence=c` | $\frac{1-c}{c}\, p_k \tau\Sigma p_k^\top$ | Posterior moves fraction $c$ toward the view (Idzorek / Walters) |
+| `confidence=c` | $\frac{1-c}{c} p_k \tau\Sigma p_k^\top$ | Posterior moves fraction $c$ toward the view (Idzorek / Walters) |
 | *(neither)* | $p_k \tau\Sigma p_k^\top$ | He-Litterman default, the same as `confidence=0.5` |
 | `omega=v` | $v$ | Set the view variance yourself |
 
