@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/zoniin/Black-Litterman-Model/actions/workflows/ci.yml/badge.svg)](https://github.com/zoniin/Black-Litterman-Model/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.10%E2%80%933.13-blue)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/zoniin/Black-Litterman-Model/blob/main/LICENSE)
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://black-litterman-mod.streamlit.app/)
 
 A small, tested Python implementation of the **Black-Litterman model**. It takes market-implied equilibrium returns, blends in your views with a Bayesian update, and turns the result into portfolios with convex optimisation.
@@ -10,11 +10,11 @@ A small, tested Python implementation of the **Black-Litterman model**. It takes
 Plain mean-variance optimisation takes historical mean returns at face value. The usual result is an extreme, unstable portfolio that piles into whichever asset had a good few years. Black-Litterman starts from the portfolio the market already holds and moves away from it only where you have an opinion, by an amount set by how confident you are.
 
 <p align="center">
-  <img src="docs/images/returns.png" width="49%" alt="Prior vs posterior expected returns">
-  <img src="docs/images/weights.png" width="49%" alt="Market vs Black-Litterman weights">
+  <img src="https://raw.githubusercontent.com/zoniin/Black-Litterman-Model/main/docs/images/returns.png" width="49%" alt="Prior vs posterior expected returns">
+  <img src="https://raw.githubusercontent.com/zoniin/Black-Litterman-Model/main/docs/images/weights.png" width="49%" alt="Market vs Black-Litterman weights">
 </p>
 
-*Eight US large caps with three illustrative views: JPM returns 14% (60% confident), XOM beats NVDA by 5% (40%), and an equal JNJ/GOOGL basket returns 12% (30%). Weights move only where the views point. Produced by [`examples/quickstart.py`](examples/quickstart.py).*
+*Eight US large caps with three illustrative views: JPM returns 14% (60% confident), XOM beats NVDA by 5% (40%), and an equal JNJ/GOOGL basket returns 12% (30%). Weights move only where the views point. Produced by [`examples/quickstart.py`](https://github.com/zoniin/Black-Litterman-Model/blob/main/examples/quickstart.py).*
 
 ## Interactive demo
 
@@ -22,7 +22,7 @@ Plain mean-variance optimisation takes historical mean returns at face value. Th
 
 Type in your own views, set how confident you are, and watch the expected returns, weights and efficient frontier update.
 
-<p align="center"><a href="https://black-litterman-mod.streamlit.app/"><img src="docs/images/app.png" width="90%" alt="Streamlit demo: a views table, portfolio metrics, and market vs Black-Litterman weights"></a></p>
+<p align="center"><a href="https://black-litterman-mod.streamlit.app/"><img src="https://raw.githubusercontent.com/zoniin/Black-Litterman-Model/main/docs/images/app.png" width="90%" alt="Streamlit demo: a views table, portfolio metrics, and market vs Black-Litterman weights"></a></p>
 
 ```bash
 pip install -e ".[app]"
@@ -90,13 +90,13 @@ Run the whole pipeline and regenerate the figures with:
 python examples/quickstart.py --save docs/images
 ```
 
-For a guided tour, see [`notebooks/walkthrough.ipynb`](notebooks/walkthrough.ipynb). It covers the equilibrium prior, how a single view propagates, what "confidence" means, and a run on live data.
+For a guided tour, see [`notebooks/walkthrough.ipynb`](https://github.com/zoniin/Black-Litterman-Model/blob/main/notebooks/walkthrough.ipynb). It covers the equilibrium prior, how a single view propagates, what "confidence" means, and a run on live data.
 
 ## Backtest: does it work out of sample?
 
-[`examples/backtest_momentum.py`](examples/backtest_momentum.py) runs four strategies monthly from 2010 to 2026 on 20 US large caps from across sectors, with 10 bp of costs per unit of turnover. Every decision uses only data available at that day's close. Black-Litterman takes **one systematic view** each month: the three 12-1 month momentum winners beat the three losers by 5% a year, held at 25% confidence.
+[`examples/backtest_momentum.py`](https://github.com/zoniin/Black-Litterman-Model/blob/main/examples/backtest_momentum.py) runs four strategies monthly from 2010 to 2026 on 20 US large caps from across sectors, with 10 bp of costs per unit of turnover. Every decision uses only data available at that day's close. Black-Litterman takes **one systematic view** each month: the three 12-1 month momentum winners beat the three losers by 5% a year, held at 25% confidence.
 
-<p align="center"><img src="docs/images/backtest.png" width="85%" alt="Walk-forward backtest equity curves and drawdowns"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/zoniin/Black-Litterman-Model/main/docs/images/backtest.png" width="85%" alt="Walk-forward backtest equity curves and drawdowns"></p>
 
 | Strategy | CAGR | Vol | Sharpe | Max DD | Turnover/yr | Eff. N | Tracking error | Info ratio |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -111,9 +111,9 @@ For a guided tour, see [`notebooks/walkthrough.ipynb`](notebooks/walkthrough.ipy
 - **Black-Litterman delivers what it promises: controlled, diversified deviations.** Classic mean-variance on historical means concentrates in about 4.6 names, turns the book over 4.3× a year, and runs 10% tracking error. Black-Litterman with the same optimiser and bounds stays at about 11 effective names and 2.3% tracking error.
 - **Confidence is a risk budget.** Across confidence levels, tracking error rises smoothly from 0.5% to 5.7%:
 
-<p align="center"><img src="docs/images/confidence_tracking_error.png" width="60%" alt="Tracking error rises with view confidence"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/zoniin/Black-Litterman-Model/main/docs/images/confidence_tracking_error.png" width="60%" alt="Tracking error rises with view confidence"></p>
 
-- **Calibrating views matters more than anything else.** A naive "half the past spread" view averages ~38% a year. With it, Sharpe falls to 0.64 and turnover reaches 6.2× a year. The full sweep is in [`docs/backtest_confidence_sweep.csv`](docs/backtest_confidence_sweep.csv).
+- **Calibrating views matters more than anything else.** A naive "half the past spread" view averages ~38% a year. With it, Sharpe falls to 0.64 and turnover reaches 6.2× a year. The full sweep is in [`docs/backtest_confidence_sweep.csv`](https://github.com/zoniin/Black-Litterman-Model/blob/main/docs/backtest_confidence_sweep.csv).
 
 *Caveats:* the universe is today's survivors (survivorship bias, shared by every strategy). Historical market caps use a constant-share-count proxy. This is one sample period. Treat it as a demonstration of the tooling, not as evidence for or against any strategy.
 
@@ -174,11 +174,11 @@ This is algebraically identical to the familiar $[(\tau\Sigma)^{-1} + P^\top\Ome
 | *(neither)* | $p_k \tau\Sigma p_k^\top$ | He-Litterman default, the same as `confidence=0.5` |
 | `omega=v` | $v$ | Set the view variance yourself |
 
-<p align="center"><img src="docs/images/confidence.png" width="80%" alt="Confidence maps linearly to how far the view moves the posterior"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/zoniin/Black-Litterman-Model/main/docs/images/confidence.png" width="80%" alt="Confidence maps linearly to how far the view moves the posterior"></p>
 
 **Weights.** The unconstrained optimum $w^* = (\delta\Sigma_{BL})^{-1}(\mu_{BL} - r_f)$ equals $w_{mkt}/(1+\tau)$ plus a combination of the view portfolios. This is why assets you have no view on keep their market weight (`bl.implied_weights()`). For long-only or bounded portfolios, pass the posterior to any optimiser in `blacklitterman.optimize`.
 
-<p align="center"><img src="docs/images/frontier.png" width="60%" alt="Efficient frontier under the posterior"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/zoniin/Black-Litterman-Model/main/docs/images/frontier.png" width="60%" alt="Efficient frontier under the posterior"></p>
 
 ## API overview
 
@@ -227,4 +227,4 @@ The tests check the maths against known results:
 
 ## License
 
-MIT. See [LICENSE](LICENSE). Nothing here is investment advice.
+MIT. See [LICENSE](https://github.com/zoniin/Black-Litterman-Model/blob/main/LICENSE). Nothing here is investment advice.

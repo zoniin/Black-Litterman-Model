@@ -29,10 +29,15 @@ app = ["black-litterman[data]", "streamlit>=1.40", "plotly>=5.20"]
 dev = ["black-litterman[plot,app]", "pytest>=8", "pytest-cov", "ruff>=0.6", "scikit-learn"]
 
 [project.urls]
-Repository = "https://github.com/zoniin/Black-Litterman-Model"
+Homepage = "https://github.com/zoniin/Black-Litterman-Model"
+Demo = "https://black-litterman-mod.streamlit.app/"
+Issues = "https://github.com/zoniin/Black-Litterman-Model/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/blacklitterman"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "README.md", "LICENSE", "pyproject.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
