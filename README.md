@@ -3,6 +3,7 @@
 [![CI](https://github.com/zoniin/Black-Litterman-Model/actions/workflows/ci.yml/badge.svg)](https://github.com/zoniin/Black-Litterman-Model/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.10%E2%80%933.13-blue)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://black-litterman-mod.streamlit.app/)
 
 A small, tested Python implementation of the **Black-Litterman model**. It takes market-implied equilibrium returns, blends in your views with a Bayesian update, and turns the result into portfolios with convex optimisation.
 
@@ -17,9 +18,11 @@ Plain mean-variance optimisation takes historical mean returns at face value. Th
 
 ## Interactive demo
 
+**[Try it live →](https://black-litterman-mod.streamlit.app/)**
+
 Type in your own views, set how confident you are, and watch the expected returns, weights and efficient frontier update.
 
-<p align="center"><img src="docs/images/app.png" width="90%" alt="Streamlit demo: a views table, portfolio metrics, and market vs Black-Litterman weights"></p>
+<p align="center"><a href="https://black-litterman-mod.streamlit.app/"><img src="docs/images/app.png" width="90%" alt="Streamlit demo: a views table, portfolio metrics, and market vs Black-Litterman weights"></a></p>
 
 ```bash
 pip install -e ".[app]"
