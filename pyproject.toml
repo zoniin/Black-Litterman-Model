@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "black-litterman"
+version = "2.0.0"
+description = "Black-Litterman portfolio construction: equilibrium priors, Idzorek view confidence, and convex mean-variance optimisation."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{ name = "zoniin" }]
+keywords = ["black-litterman", "portfolio-optimization", "asset-allocation", "quantitative-finance", "bayesian"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Science/Research",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Programming Language :: Python :: 3",
+    "Typing :: Typed",
+]
+dependencies = ["numpy>=1.24", "pandas>=2.0", "cvxpy>=1.4"]
+
+[project.optional-dependencies]
+plot = ["matplotlib>=3.7"]
+data = ["yfinance>=0.2.54"]
+notebook = ["black-litterman[plot,data]", "jupyterlab"]
+dev = ["black-litterman[plot]", "pytest>=8", "pytest-cov", "ruff>=0.6", "scikit-learn"]
+
+[project.urls]
+Repository = "https://github.com/zoniin/Black-Litterman-Model"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/blacklitterman"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "NPY", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003", "RUF022"]
