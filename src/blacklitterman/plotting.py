@@ -24,6 +24,7 @@ __all__ = [
     "plot_weights",
     "plot_efficient_frontier",
     "plot_correlation",
+    "plot_backtest",
 ]
 
 PALETTE = {
@@ -187,3 +188,32 @@ def plot_correlation(cov: pd.DataFrame, ax=None, title: str = "Correlation"):
     ax.grid(False)
     ax.figure.colorbar(im, ax=ax, shrink=0.8).outline.set_visible(False)
     return ax
+
+
+def plot_backtest(result, colors: Mapping[str, str] | None = None, title: str = "Walk-forward backtest"):
+    """Growth of $1 (log scale) above drawdowns, one line per strategy.
+
+    ``result`` is a :class:`~blacklitterman.backtest.BacktestResult`. Returns the figure.
+    """
+    names = list(result.returns.columns)
+    colors = dict(colors or {})
+    for name, c in zip(names, SERIES, strict=False):
+        colors.setdefault(name, c)
+    fig, (top, bottom) = plt.subplots(
+        2, 1, figsize=(10, 6.5), sharex=True, height_ratios=[3, 1.3], layout="constrained"
+    )
+    eq, dd = result.equity, result.drawdown
+    for name in names:
+        lw = 2.2 if colors[name] == PALETTE["blue"] else 1.6
+        top.plot(eq.index, eq[name], color=colors[name], linewidth=lw, label=name)
+        bottom.plot(dd.index, dd[name], color=colors[name], linewidth=1.2)
+    top.set_yscale("log")
+    top.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f"${y:g}"))
+    top.yaxis.set_minor_formatter(plt.NullFormatter())
+    bottom.yaxis.set_major_formatter(PercentFormatter(1.0, decimals=0))
+    bottom.set_ylabel("Drawdown", color=PALETTE["muted"], fontsize=9)
+    top.set_ylabel("Growth of $1", color=PALETTE["muted"], fontsize=9)
+    _style(top, title)
+    _style(bottom)
+    _legend(top, above=True, ncols=len(names))
+    return fig

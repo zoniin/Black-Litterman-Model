@@ -26,3 +26,19 @@ def test_all_plots_render(bl):
         ax.figure.canvas.draw()
     assert "Absolute view" in [t.get_text() for t in axes[0].get_legend().get_texts()]
     plt.close("all")
+
+
+def test_plot_backtest(cov, caps):
+    import numpy as np
+    import pandas as pd
+
+    from blacklitterman import backtest, equal_weight
+
+    rng = np.random.default_rng(0)
+    idx = pd.bdate_range("2020-01-01", periods=120)
+    prices = pd.DataFrame(100 * np.cumprod(1 + rng.normal(0, 0.01, (120, 3)), axis=0), index=idx, columns=list("ABC"))
+    res = backtest(prices, {"EW": equal_weight(), "A": lambda ctx: pd.Series({"A": 1.0})}, lookback=20)
+    fig = plotting.plot_backtest(res)
+    fig.canvas.draw()
+    assert len(fig.axes) == 2
+    plt.close("all")
